@@ -1,83 +1,96 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase, Client
+from django.urls import reverse
 
 from http import HTTPStatus
 from posts.models import Post, Group
+
 User = get_user_model()
+
+URL_INDEX = reverse("posts:index")
+AUTHOR_USERNAME = "test_user"
+GROUP_SLUG = "test_slug"
+URL_GROUP = reverse("posts:group_list", args=[GROUP_SLUG])
+URL_AUTHOR_PROFILE = reverse("posts:profile", args=[AUTHOR_USERNAME])
+URL_CREATE_POST = reverse("posts:post_create")
 
 
 class PostURLTests(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-
-        cls.user = User.objects.create(username="Test_User",)
-
+        cls.author_user = User.objects.create(
+            username=AUTHOR_USERNAME,
+        )
         cls.group = Group.objects.create(
-            id="10",
             title="группа",
-            slug="one_group",
+            slug=GROUP_SLUG,
             description="проверка описания",
         )
-
         cls.post = Post.objects.create(
-            text='Тестовый текст',
-            author=User.objects.get(username="Test_User"),
-            group=Group.objects.get(title="группа"),
+            text="Тестовый текст",
+            author=cls.author_user,
+            group=cls.group,
         )
-
-        cls.post_url = f'/posts/{cls.post.id}/'
-        cls.post_edit_url = f'/posts/{cls.post.id}/edit/'
-        cls.public_urls = (
-            ('/', 'index.html'),
-            (f'/group/{cls.group.slug}/', 'group.html'),
-            (f'/profile/{cls.user.username}/', 'profile.html'),
-            (cls.post_url, 'post.html'),
-        )
-        cls.private_urls = (
-            ('/create/', 'create_post.html'),
-            (cls.post_edit_url, 'create_post.html')
-        )
+        cls.POST_URL = reverse("posts:post_detail", args=[cls.post.id])
+        cls.POST_EDIT_URL = reverse("posts:post_edit", args=[cls.post.id])
 
     def setUp(self):
         # Создаем неавторизованный клиент
         self.guest_client = Client()
         # Создаем авторизованый клиент
-        self.user = User.objects.get(username="Test_User")
+        self.user = User.objects.create_user(username="some_user")
         self.authorized_client = Client()
         self.authorized_client.force_login(self.user)
+        self.author_client = Client()
+        self.author_client.force_login(PostURLTests.author_user)
 
-    # Проверяем общедоступные страницы
-    def test_public_pages(self):
-        for data in self.public_urls:
-            print(data[0])
-            response = self.guest_client.get(data[0])
-            self.assertEqual(response.status_code, 200)
-
-    # Проверяем доступ для авторизованного пользователя и автора
-    def test_private_pages(self):
-        for data in self.private_urls:
-            response = self.authorized_client.get(data[0])
-            self.assertEqual(response.status_code, HTTPStatus.OK)
+    def test_urls_status(self):
+        address_status_client = [
+            [URL_INDEX, HTTPStatus.OK, self.guest_client],
+            [URL_GROUP, HTTPStatus.OK, self.guest_client],
+            [URL_AUTHOR_PROFILE, HTTPStatus.OK, self.guest_client],
+            [URL_CREATE_POST, HTTPStatus.OK, self.authorized_client],
+            [URL_CREATE_POST, HTTPStatus.FOUND, self.guest_client],
+            [PostURLTests.POST_URL, HTTPStatus.OK, self.guest_client],
+            [PostURLTests.POST_EDIT_URL, HTTPStatus.FOUND, self.guest_client],
+            [
+                PostURLTests.POST_EDIT_URL,
+                HTTPStatus.FOUND,
+                self.authorized_client,
+            ],
+            [PostURLTests.POST_EDIT_URL, HTTPStatus.OK, self.author_client],
+        ]
+        for test in address_status_client:
+            adress, status, client = test
+            self.assertEqual(
+                client.get(adress).status_code,
+                status,
+                f"{adress} вернул другой статус код. Нежели {status}",
+            )
 
     # Проверяем статус 404 для авторизованного пользователя
     def test_task_list_url_redirect_anonymous(self):
         """Страница /unexisting_page/ не существует."""
-        response = self.authorized_client.get('/unexisting_page/')
+        response = self.authorized_client.get("/unexisting_page/")
         self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
 
     # Проверка вызываемых шаблонов для каждого адреса
     def test_urls_uses_correct_template(self):
         """URL-адрес использует соответствующий шаблон."""
         templates_url_names = {
-            '/': 'posts/index.html',
-            '/group/one_group/': 'posts/group_list.html',
-            '/profile/Test_User/': 'posts/profile.html',
-            '/posts/1/': 'posts/post_detail.html',
-            '/posts/1/edit/': 'posts/create_post.html',
-            '/create/': 'posts/create_post.html',
+            URL_INDEX: "posts/index.html",
+            URL_GROUP: "posts/group_list.html",
+            URL_AUTHOR_PROFILE: "posts/profile.html",
+            PostURLTests.POST_URL: "posts/post_detail.html",
+            PostURLTests.POST_EDIT_URL: "posts/create_post.html",
+            URL_CREATE_POST: "posts/create_post.html",
         }
         for url, template in templates_url_names.items():
             with self.subTest(url=url):
-                response = self.authorized_client.get(url)
-                self.assertTemplateUsed(response, template)
+                response = self.author_client.get(url)
+                self.assertTemplateUsed(
+                    response,
+                    template,
+                    f"неверный шаблон - {template} для адреса {url}",
+                )

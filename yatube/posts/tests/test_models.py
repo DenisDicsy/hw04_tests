@@ -18,7 +18,7 @@ class PostModelTest(TestCase):
 
     def test_post_str(self):
         """Проверка __str__ у post."""
-        self.assertEqual(self.post.text[:15], str(self.post))
+        self.assertEqual(PostModelTest.post.text[:15], str(PostModelTest.post))
 
     def test_post_verbose_name(self):
         """Проверка verbose_name у post."""
@@ -26,7 +26,8 @@ class PostModelTest(TestCase):
             'text': 'Текст поста',
             'pub_date': 'Дата публикации',
             'author': 'Автор',
-            'group': 'Группа', }
+            'group': 'Группа',
+        }
         for value, expected in field_verboses.items():
             with self.subTest(value=value):
                 verbose_name = self.post._meta.get_field(value).verbose_name
@@ -47,7 +48,6 @@ class GroupModelTest(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.user = User.objects.create_user(username='auth')
         cls.group = Group.objects.create(
             title='Тестовая группа',
             slug='Тестовый слаг',
@@ -56,7 +56,7 @@ class GroupModelTest(TestCase):
 
     def test_group_str(self):
         """Проверка __str__ у group."""
-        self.assertEqual(self.group.title, str(self.group))
+        self.assertEqual(GroupModelTest.group.title, str(GroupModelTest.group))
 
     def test_group_verbose_name(self):
         """Проверка verbose_name у group."""
