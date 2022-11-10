@@ -66,18 +66,19 @@ class PostPagesTests(TestCase):
         addresses = [
             URL_INDEX,  # страница с пагинацией. В контексте 'page_obj'
             URL_GROUP,  # страница с пагинацией. В контексте 'page_obj'
-            URL_AUTHOR_PROFILE,  # страница с пагинацией. В контексте 'page_obj'
-            PostPagesTests.POST_URL,  # страница без пагинации. В контексте 'post'
+            URL_AUTHOR_PROFILE,  # с пагинацией. В контексте 'page_obj'
+            PostPagesTests.POST_URL,  # без пагинации. В контексте 'post'
         ]
         for adress in addresses:
             response = self.author_client.get(adress)
             if (
                 "page_obj" in response.context
-            ):  # тут мы используем обычный "in", чтобы в правильно сформировать переменную post. Так как на странице детального поста, нет 'page obj'.
+            ):  # мы используем "in", чтобы в правильно сформировать post.
+                # Так как на странице детального поста, нет 'page obj'.
                 post = response.context.get("page_obj")[
                     0
-                ]  # если использовать assertIn, то тест для страницы детального поста всегда будет "падать"
-            else:
+                ]  # если использовать assertIn, то тест для страницы
+            else:  # детального поста всегда будет "падать"
                 post = response.context.get("post")
             self.check_post_info(post)
 
@@ -120,20 +121,20 @@ class PaginatorViewsTest(TestCase):
         """Проверка пагинации на страницах."""
         posts_on_first_page = 10
         posts_on_second_page = 3
-        for reverse in PaginatorViewsTest.PAGES_WITH_PAGINATOR:
-            with self.subTest(reverse=reverse):
+        for reverse_address in PaginatorViewsTest.PAGES_WITH_PAGINATOR:
+            with self.subTest(reverse_address=reverse_address):
                 self.assertEqual(
                     len(
-                        self.unauthorized_client.get(reverse).context.get(
-                            "page_obj"
-                        )
+                        self.unauthorized_client.get(
+                            reverse_address
+                        ).context.get("page_obj")
                     ),
                     posts_on_first_page,
                 )
                 self.assertEqual(
                     len(
                         self.unauthorized_client.get(
-                            reverse + "?page=2"
+                            reverse_address + "?page=2"
                         ).context.get("page_obj")
                     ),
                     posts_on_second_page,
